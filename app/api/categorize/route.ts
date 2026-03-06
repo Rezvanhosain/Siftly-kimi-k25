@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import prisma from '@/lib/db'
+import { createCliAnthropicClient } from '@/lib/claude-cli-auth'
 import {
   seedDefaultCategories,
   categorizeBatch,
@@ -143,8 +144,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   })
 
   const anthropicApiKey =
-    (await prisma.setting.findUnique({ where: { key: 'anthropicApiKey' } }))?.value ??
-    process.env.ANTHROPIC_API_KEY ??
+    (await prisma.setting.findUnique({ where: { key: 'anthropicApiKey' } }))?.value?.trim() ||
+    process.env.ANTHROPIC_API_KEY ||
     ''
   const baseURL = process.env.ANTHROPIC_BASE_URL
 
@@ -152,11 +153,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const counts = { visionTagged: 0, entitiesExtracted: 0, enriched: 0, categorized: 0 }
 
     try {
-      if (!anthropicApiKey) {
-        setState({ lastError: 'No Anthropic API key configured. Go to Settings to add one.' })
-        console.error('No API key — skipping pipeline')
+      const resolvedClient = anthropicApiKey
+        ? new Anthropic({ apiKey: anthropicApiKey, ...(baseURL ? { baseURL } : {}) })
+        : createCliAnthropicClient(baseURL)
+
+      if (!resolvedClient) {
+        setState({ lastError: 'No Anthropic API key configured. Go to Settings to add one, or log in with Claude CLI.' })
+        console.error('No API key or CLI auth — skipping pipeline')
       } else {
-        const client = new Anthropic({ apiKey: anthropicApiKey, ...(baseURL ? { baseURL } : {}) })
+        const client: Anthropic = resolvedClient
 
         await seedDefaultCategories()
 

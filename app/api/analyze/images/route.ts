@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import prisma from '@/lib/db'
 import { analyzeBatch } from '@/lib/vision-analyzer'
+import { createCliAnthropicClient } from '@/lib/claude-cli-auth'
 
 // GET: returns progress stats
 export async function GET(): Promise<NextResponse> {
@@ -22,9 +23,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // use default
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY ?? ''
   const baseURL = process.env.ANTHROPIC_BASE_URL
-  const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) })
+  const apiKey = process.env.ANTHROPIC_API_KEY || ''
+  const client: Anthropic = apiKey
+    ? new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) })
+    : (createCliAnthropicClient(baseURL) ?? new Anthropic({ apiKey: '', ...(baseURL ? { baseURL } : {}) }))
 
   const untagged = await prisma.mediaItem.findMany({
     where: { imageTags: null, type: { in: ['photo', 'gif'] } },

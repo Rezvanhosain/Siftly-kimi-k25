@@ -8,7 +8,7 @@
   <p>Import · Analyze · Categorize · Search · Explore</p>
 
   <p>
-    <img src="https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js" alt="Next.js 15" />
+    <img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js" alt="Next.js 16" />
     <img src="https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript" alt="TypeScript" />
     <img src="https://img.shields.io/badge/SQLite-local-green?style=flat-square&logo=sqlite" alt="SQLite" />
     <img src="https://img.shields.io/badge/Tailwind-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind CSS" />
@@ -27,9 +27,9 @@ It runs a **4-stage AI pipeline** on your bookmarks:
 ```
 📥 Import (built-in bookmarklet or console script — no extensions needed)
     ↓
-🏷️  Entity Extraction   — mines hashtags, URLs, mentions from raw tweet data (free, zero API calls)
+🏷️  Entity Extraction   — mines hashtags, URLs, mentions, and 100+ known tools from raw tweet data (free, zero API calls)
     ↓
-👁️  Vision Analysis      — reads text, objects, and context from every image/GIF/video thumbnail
+👁️  Vision Analysis      — reads text, objects, and context from every image/GIF/video thumbnail (30–40 visual tags per image)
     ↓
 🧠 Semantic Tagging     — generates 25–35 searchable tags per bookmark for AI-powered search
     ↓
@@ -46,59 +46,77 @@ After the pipeline runs, you get:
 
 ## Quick Start
 
-> **Using Claude Code or Claude CLI?** Run `claude setup-token` in your terminal to get your API key, then paste it into Siftly Settings.
-
 ### Prerequisites
 
-- Node.js 18+
-- npm
-- An [Anthropic API key](https://console.anthropic.com) — required for AI features
+- [Node.js 18+](https://nodejs.org)
+- npm (comes with Node.js)
 
-### 1. Clone & Install
+**That's it.** If you have [Claude Code CLI](https://claude.ai/code) installed and signed in, AI features work automatically — no API key needed.
+
+### Option A — One command (recommended)
+
+```bash
+git clone https://github.com/viperrcrypto/Siftly.git
+cd Siftly
+./start.sh
+```
+
+`start.sh` installs dependencies, sets up the database, checks for Claude CLI auth, and opens [http://localhost:3000](http://localhost:3000) automatically.
+
+### Option B — Using Claude Code
+
+If you're using [Claude Code](https://claude.ai/code) to set up the project, it will read `CLAUDE.md` and know exactly how to get started. Just open the project folder:
+
+```bash
+git clone https://github.com/viperrcrypto/Siftly.git
+claude Siftly/
+```
+
+Claude Code will handle setup and start the app using your existing Claude subscription — no extra configuration needed.
+
+### Option C — Manual setup
 
 ```bash
 git clone https://github.com/viperrcrypto/Siftly.git
 cd Siftly
 npm install
-```
-
-### 2. Set Up Database
-
-```bash
+npx prisma generate
 npx prisma db push
-```
-
-Creates a local SQLite database at `prisma/dev.db`. No external database needed.
-
-### 3. Configure Environment
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local`:
-
-```env
-# Required
-DATABASE_URL="file:./prisma/dev.db"
-
-# Required for AI features — get yours at console.anthropic.com
-# Claude CLI users: run `claude setup-token` in your terminal to get this
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Optional: custom API endpoint (proxies, local models)
-# ANTHROPIC_BASE_URL=http://localhost:8080
-```
-
-> **Tip:** You can also enter your API key directly in the Siftly **Settings** page after launch — no restart required. The Settings page shows a copyable `claude setup-token` command for Claude CLI users.
-
-### 4. Run
-
-```bash
-npm run dev
+npx next dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+---
+
+## AI Authentication
+
+Siftly automatically detects the best available auth method — no configuration needed in the most common case.
+
+### Priority order
+
+| # | Method | How |
+|---|--------|-----|
+| 1 | **Claude Code CLI** *(zero config)* | Already signed in? Siftly reads your session from the macOS keychain automatically |
+| 2 | **API key in Settings** | Open Settings in the app and paste your key |
+| 3 | **`ANTHROPIC_API_KEY` env var** | Set in `.env.local` or your shell environment |
+| 4 | **Local proxy** | Set `ANTHROPIC_BASE_URL` to any Anthropic-compatible endpoint |
+
+### Claude Code CLI (no API key needed)
+
+If you use [Claude Code](https://claude.ai/code), you're already signed in. Siftly detects your session from the macOS keychain and uses your Claude subscription (Free/Pro/Max) automatically.
+
+The Settings page shows a green **"Claude CLI detected — no API key needed"** badge with your subscription tier when this is active.
+
+> **Note:** This works on macOS. On Linux/Windows, add an API key in Settings instead.
+
+### Getting an API key (if needed)
+
+1. Go to [console.anthropic.com](https://console.anthropic.com)
+2. Create a new API key
+3. Open Siftly → Settings → paste it in
+
+New accounts include $5 free credit — enough for thousands of bookmarks at Haiku pricing (~$0.00025/bookmark).
 
 ---
 
@@ -110,7 +128,7 @@ Siftly has **built-in import tools** — no browser extensions required. Go to t
 
 1. Go to **Import** in the Siftly sidebar
 2. Drag the **"Export X Bookmarks"** link to your browser's bookmark bar
-   *(or copy the URL manually: right-click bookmark bar → Add Bookmark → paste the URL)*
+   *(or right-click the bookmark bar → Add Bookmark → paste the URL)*
 3. Go to [x.com/i/bookmarks](https://x.com/i/bookmarks) while logged in to X
 4. Click **"Export X Bookmarks"** in your bookmark bar — a purple button appears on the page
 5. Click **"▶ Auto-scroll"** — the tool scrolls through and captures all your bookmarks automatically
@@ -144,8 +162,8 @@ Re-import anytime — Siftly automatically skips duplicates and only adds new bo
 
 | Stage | What it does |
 |-------|-------------|
-| **Entity Extraction** | Mines hashtags, URLs, @mentions, and 80+ known tool/product names from stored tweet JSON |
-| **Vision Analysis** | Analyzes every image, GIF, and video thumbnail — OCR text, objects, scene, mood, meme templates, 30–40 visual tags |
+| **Entity Extraction** | Mines hashtags, URLs, @mentions, and 100+ known tool/product names from stored tweet JSON — free, zero API calls |
+| **Vision Analysis** | Analyzes every image, GIF, and video thumbnail — OCR text, objects, scene, mood, meme templates, 30–40 visual tags per image |
 | **Semantic Tagging** | Generates 25–35 precise search tags per bookmark by combining tweet text + image context. Also extracts sentiment, people, and company names. |
 | **Categorization** | Assigns 1–3 categories per bookmark with confidence scores using all enriched data |
 
@@ -219,22 +237,11 @@ All settings are manageable in the **Settings** page at `/settings` or via envir
 
 | Setting | Env Var | Description |
 |---------|---------|-------------|
-| Anthropic API Key | `ANTHROPIC_API_KEY` | Required for AI features. Claude CLI users: run `claude setup-token` |
-| API Base URL | `ANTHROPIC_BASE_URL` | Custom endpoint for API proxies or local models |
-| AI Model | Settings page | Haiku 4.5 (default), Sonnet 4.6, Opus 4.6 |
-| OpenAI Key | Settings page | Alternative provider if no Anthropic key is set |
-| Database | `DATABASE_URL` | SQLite file path |
-
-### Getting Your API Key
-
-**Option 1 — Claude CLI (fastest):**
-```bash
-claude setup-token
-```
-Copy the printed token and paste it into Siftly Settings.
-
-**Option 2 — Anthropic Console:**
-Go to [console.anthropic.com](https://console.anthropic.com), create an API key, and paste it into Settings.
+| Anthropic API Key | `ANTHROPIC_API_KEY` | Optional if Claude CLI is signed in — otherwise required for AI features |
+| API Base URL | `ANTHROPIC_BASE_URL` | Custom endpoint for proxies or local Anthropic-compatible models |
+| AI Model | Settings page only | Haiku 4.5 (default, fastest/cheapest), Sonnet 4.6, Opus 4.6 |
+| OpenAI Key | Settings page only | Alternative provider if no Anthropic key is set |
+| Database | `DATABASE_URL` | SQLite file path (default: `file:./prisma/dev.db`) |
 
 ### Custom API Endpoint
 
@@ -252,44 +259,64 @@ ANTHROPIC_BASE_URL=http://localhost:8080
 siftly/
 ├── app/
 │   ├── api/
+│   │   ├── analyze/images/   # Batch image vision analysis (GET progress, POST run)
 │   │   ├── bookmarks/        # List, filter, paginate, delete
-│   │   ├── categorize/       # 4-stage AI pipeline (start, status, stop)
+│   │   │   └── [id]/categories/ # Per-bookmark category management
 │   │   ├── categories/       # Category CRUD
+│   │   │   └── [slug]/       # Individual category operations
+│   │   ├── categorize/       # 4-stage AI pipeline (start, status, stop)
 │   │   ├── export/           # CSV, JSON, ZIP export
 │   │   ├── import/           # JSON file import with dedup + auto-pipeline trigger
+│   │   │   ├── bookmarklet/  # Bookmarklet-specific import endpoint
+│   │   │   └── twitter/      # Twitter-specific import endpoint
 │   │   ├── link-preview/     # Server-side OG metadata scraper
+│   │   ├── media/            # Media proxy/download endpoint
 │   │   ├── mindmap/          # Graph nodes + edges for visualization
 │   │   ├── search/ai/        # Natural language semantic search (FTS5 + Claude)
-│   │   ├── settings/         # API key + model config + key test endpoint
+│   │   ├── settings/         # API key + model config
+│   │   │   ├── cli-status/   # Claude CLI auth detection endpoint
+│   │   │   └── test/         # API key validation endpoint
 │   │   └── stats/            # Dashboard stats
 │   ├── ai-search/            # AI search page
 │   ├── bookmarks/            # Browse, filter, paginate
-│   ├── categorize/           # Pipeline monitor with live progress
 │   ├── categories/           # Category management
-│   ├── import/               # 3-step import flow (instructions → upload → auto-categorize)
+│   │   └── [slug]/           # Category detail page
+│   ├── categorize/           # Pipeline monitor with live progress
+│   ├── import/               # 3-step import flow (instructions → upload → categorize)
 │   ├── mindmap/              # Interactive graph
 │   ├── settings/             # Configuration
+│   ├── twitter-import/       # Alternative Twitter import page
 │   └── page.tsx              # Dashboard
 │
 ├── components/
-│   ├── bookmark-card.tsx     # Card with media, link previews, categories, hover actions
-│   ├── category-card.tsx     # Category display card
+│   ├── mindmap/              # Mindmap canvas, nodes, edges
+│   │   ├── mindmap-canvas.tsx
+│   │   ├── category-node.tsx
+│   │   ├── tweet-node.tsx
+│   │   ├── root-node.tsx
+│   │   ├── chain-edge.tsx
+│   │   └── mindmap-context.ts
 │   ├── command-palette.tsx   # Cmd+K global search
 │   ├── nav.tsx               # Sidebar navigation
 │   └── theme-toggle.tsx      # Light/dark mode
 │
 ├── lib/
 │   ├── categorizer.ts        # AI categorization logic + default categories
+│   ├── claude-cli-auth.ts    # Claude CLI OAuth session detection (macOS keychain)
 │   ├── vision-analyzer.ts    # Image analysis + batch semantic tagging
 │   ├── image-context.ts      # Shared image context builder
 │   ├── fts.ts                # SQLite FTS5 full-text search index
 │   ├── rawjson-extractor.ts  # Entity extraction from raw tweet JSON
 │   ├── parser.ts             # Multi-format JSON parser
 │   ├── exporter.ts           # CSV, JSON, ZIP export
+│   ├── types.ts              # Shared TypeScript types
 │   └── db.ts                 # Prisma client singleton
 │
-└── prisma/
-    └── schema.prisma         # SQLite schema
+├── prisma/
+│   └── schema.prisma         # SQLite schema
+│
+├── start.sh                  # One-command launcher (install + DB setup + open browser)
+└── CLAUDE.md                 # Instructions for Claude Code AI assistant
 ```
 
 ### Database Schema
@@ -308,32 +335,33 @@ ImportJob         — tracks import file status and progress
 
 ## Tech Stack
 
-| Technology | Role |
-|------------|------|
-| [Next.js 15](https://nextjs.org) | Full-stack framework (App Router) |
-| [TypeScript 5](https://www.typescriptlang.org) | Type safety throughout |
-| [Prisma 7](https://www.prisma.io) | ORM + migrations |
-| [SQLite](https://sqlite.org) | Local database — zero setup, includes FTS5 |
-| [Tailwind CSS v4](https://tailwindcss.com) | Styling |
-| [Anthropic SDK](https://anthropic.com) | Vision, semantic tagging, categorization, search |
-| [React Flow](https://reactflow.dev) | Interactive mindmap graph |
-| [Radix UI](https://www.radix-ui.com) | Accessible UI primitives |
-| [JSZip](https://stuk.github.io/jszip/) | Category ZIP export |
-| [Lucide React](https://lucide.dev) | Icons |
+| Technology | Version | Role |
+|------------|---------|------|
+| [Next.js](https://nextjs.org) | 16 | Full-stack framework (App Router) |
+| [TypeScript](https://www.typescriptlang.org) | 5 | Type safety throughout |
+| [Prisma](https://www.prisma.io) | 7 | ORM + migrations |
+| [SQLite](https://sqlite.org) | — | Local database — zero setup, includes FTS5 |
+| [Tailwind CSS](https://tailwindcss.com) | v4 | Styling |
+| [Anthropic SDK](https://anthropic.com) | — | Vision, semantic tagging, categorization, search |
+| [@xyflow/react](https://xyflow.com) | 12 | Interactive mindmap graph |
+| [Framer Motion](https://www.framer.com/motion/) | 12 | Animations |
+| [Radix UI](https://www.radix-ui.com) | — | Accessible UI primitives |
+| [JSZip](https://stuk.github.io/jszip/) | — | Category ZIP export |
+| [Lucide React](https://lucide.dev) | — | Icons |
 
 ---
 
 ## Development
 
 ```bash
-# Install dependencies
+# One-command start (installs, sets up DB, opens browser)
+./start.sh
+
+# Or manually:
 npm install
-
-# Create database (runs once)
+npx prisma generate
 npx prisma db push
-
-# Start development server
-npm run dev
+npx next dev
 
 # Type check
 npx tsc --noEmit
@@ -372,6 +400,12 @@ Add domain strings to `KNOWN_TOOL_DOMAINS` in `lib/rawjson-extractor.ts` to have
 - The only external calls are to the AI provider you configure (tweet text + image data)
 - No telemetry, no tracking, no accounts required
 - Your bookmarks never touch any third-party server except your configured AI endpoint
+
+---
+
+## Support Development
+
+If Siftly saves you time, consider leaving a tip ☕
 
 ---
 

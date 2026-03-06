@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import prisma from '@/lib/db'
 import { ftsSearch } from '@/lib/fts'
+import { createCliAnthropicClient } from '@/lib/claude-cli-auth'
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 interface CacheEntry { results: unknown; expiresAt: number }
@@ -30,9 +31,22 @@ let _categoriesCacheExpiry = 0
 async function getApiKey(): Promise<string> {
   if (_apiKey !== null && Date.now() < _apiKeyExpiry) return _apiKey
   const setting = await prisma.setting.findUnique({ where: { key: 'anthropicApiKey' } })
-  _apiKey = setting?.value?.trim() || process.env.ANTHROPIC_API_KEY || ''
-  _apiKeyExpiry = Date.now() + 60 * 1000 // 1-minute TTL (key changes are rare)
+  const fromDb = setting?.value?.trim()
+  if (fromDb) { _apiKey = fromDb; _apiKeyExpiry = Date.now() + 60_000; return _apiKey }
+  const fromEnv = process.env.ANTHROPIC_API_KEY
+  if (fromEnv) { _apiKey = fromEnv; _apiKeyExpiry = Date.now() + 60_000; return _apiKey }
+  _apiKey = ''
+  _apiKeyExpiry = Date.now() + 60_000
   return _apiKey
+}
+
+function resolveSearchClient(apiKey: string): Anthropic {
+  const baseURL = process.env.ANTHROPIC_BASE_URL
+  if (apiKey) return new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) })
+  const cliClient = createCliAnthropicClient(baseURL)
+  if (cliClient) return cliClient
+  if (baseURL) return new Anthropic({ apiKey: 'proxy', baseURL })
+  throw new Error('No Anthropic API key configured. Add it in Settings or log in with Claude CLI.')
 }
 async function getAnthropicModel(): Promise<string> {
   if (_model && Date.now() < _modelExpiry) return _model
@@ -214,16 +228,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!query?.trim()) return NextResponse.json({ error: 'Query required' }, { status: 400 })
 
   const apiKey = await getApiKey()
-  if (!apiKey) {
-    return NextResponse.json({ error: 'No Anthropic API key configured. Add it in Settings.' }, { status: 400 })
-  }
 
   const cacheKey = `${query.trim().toLowerCase()}::${category ?? ''}`
   const cached = getCached(cacheKey)
   if (cached) return NextResponse.json(cached)
 
-  const baseURL = process.env.ANTHROPIC_BASE_URL
-  const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) })
+  let client: Anthropic
+  try {
+    client = resolveSearchClient(apiKey)
+  } catch {
+    return NextResponse.json({ error: 'No Anthropic API key configured. Add it in Settings or log in with Claude CLI.' }, { status: 400 })
+  }
   const model = await getAnthropicModel()
 
   const categoryFilter = category

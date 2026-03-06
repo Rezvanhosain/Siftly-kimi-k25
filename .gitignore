@@ -56,3 +56,6 @@ dev.db-journal
 # OS
 .DS_Store
 Thumbs.db
+
+# Promo video tool (local only)
+promo-video/
