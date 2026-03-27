@@ -1,0 +1,72 @@
+import prisma from '@/lib/db'
+
+// Module-level caches — avoids hundreds of DB roundtrips per pipeline run
+let _cachedModel: string | null = null
+let _modelCacheExpiry = 0
+
+let _cachedProvider: 'anthropic' | 'openai' | null = null
+let _providerCacheExpiry = 0
+
+let _cachedOpenAIModel: string | null = null
+let _openAIModelCacheExpiry = 0
+
+const CACHE_TTL = 5 * 60 * 1000
+
+/**
+ * Get the configured Anthropic model from settings (cached for 5 minutes).
+ * NOTE: Deprecated in Kimi K2.5 fork. Use getOpenAIModel() instead.
+ */
+export async function getAnthropicModel(): Promise<string> {
+  if (_cachedModel && Date.now() < _modelCacheExpiry) return _cachedModel
+  const setting = await prisma.setting.findUnique({ where: { key: 'anthropicModel' } })
+  _cachedModel = setting?.value ?? 'claude-haiku-4-5-20251001'
+  _modelCacheExpiry = Date.now() + CACHE_TTL
+  return _cachedModel
+}
+
+/**
+ * Get the active AI provider (cached for 5 minutes).
+ * DEFAULTS to 'openai' in Kimi K2.5 fork for Moonshot compatibility.
+ */
+export async function getProvider(): Promise<'anthropic' | 'openai'> {
+  if (_cachedProvider && Date.now() < _providerCacheExpiry) return _cachedProvider
+  const setting = await prisma.setting.findUnique({ where: { key: 'aiProvider' } })
+  // DEFAULT: Use OpenAI (Moonshot/Kimi) instead of Anthropic
+  _cachedProvider = setting?.value === 'anthropic' ? 'anthropic' : 'openai'
+  _providerCacheExpiry = Date.now() + CACHE_TTL
+  return _cachedProvider
+}
+
+/**
+ * Get the configured OpenAI model from settings (cached for 5 minutes).
+ * DEFAULTS to Kimi K2.5 in this fork.
+ */
+export async function getOpenAIModel(): Promise<string> {
+  if (_cachedOpenAIModel && Date.now() < _openAIModelCacheExpiry) return _cachedOpenAIModel
+  const setting = await prisma.setting.findUnique({ where: { key: 'openaiModel' } })
+  // DEFAULT: Kimi K2.5 model for Moonshot AI
+  _cachedOpenAIModel = setting?.value ?? 'kimi-kb2.5'
+  _openAIModelCacheExpiry = Date.now() + CACHE_TTL
+  return _cachedOpenAIModel
+}
+
+/**
+ * Get the model for the currently active provider.
+ * In this fork, always returns OpenAI/Moonshot model.
+ */
+export async function getActiveModel(): Promise<string> {
+  const provider = await getProvider()
+  return provider === 'openai' ? getOpenAIModel() : getOpenAIModel()
+}
+
+/**
+ * Clear all settings caches (call after settings are changed).
+ */
+export function invalidateSettingsCache(): void {
+  _cachedModel = null
+  _modelCacheExpiry = 0
+  _cachedProvider = null
+  _providerCacheExpiry = 0
+  _cachedOpenAIModel = null
+  _openAIModelCacheExpiry = 0
+}
