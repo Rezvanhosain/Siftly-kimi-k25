@@ -14,6 +14,7 @@ const CACHE_TTL = 5 * 60 * 1000
 
 /**
  * Get the configured Anthropic model from settings (cached for 5 minutes).
+ * NOTE: Deprecated in Kimi K2.5 fork. Use getOpenAIModel() instead.
  */
 export async function getAnthropicModel(): Promise<string> {
   if (_cachedModel && Date.now() < _modelCacheExpiry) return _cachedModel
@@ -25,32 +26,37 @@ export async function getAnthropicModel(): Promise<string> {
 
 /**
  * Get the active AI provider (cached for 5 minutes).
+ * DEFAULTS to 'openai' in Kimi K2.5 fork for Moonshot compatibility.
  */
 export async function getProvider(): Promise<'anthropic' | 'openai'> {
   if (_cachedProvider && Date.now() < _providerCacheExpiry) return _cachedProvider
   const setting = await prisma.setting.findUnique({ where: { key: 'aiProvider' } })
-  _cachedProvider = setting?.value === 'openai' ? 'openai' : 'anthropic'
+  // DEFAULT: Use OpenAI (Moonshot/Kimi) instead of Anthropic
+  _cachedProvider = setting?.value === 'anthropic' ? 'anthropic' : 'openai'
   _providerCacheExpiry = Date.now() + CACHE_TTL
   return _cachedProvider
 }
 
 /**
  * Get the configured OpenAI model from settings (cached for 5 minutes).
+ * DEFAULTS to Kimi K2.5 in this fork.
  */
 export async function getOpenAIModel(): Promise<string> {
   if (_cachedOpenAIModel && Date.now() < _openAIModelCacheExpiry) return _cachedOpenAIModel
   const setting = await prisma.setting.findUnique({ where: { key: 'openaiModel' } })
-  _cachedOpenAIModel = setting?.value ?? 'gpt-4.1-mini'
+  // DEFAULT: Kimi K2.5 model for Moonshot AI
+  _cachedOpenAIModel = setting?.value ?? 'kimi-kb2.5'
   _openAIModelCacheExpiry = Date.now() + CACHE_TTL
   return _cachedOpenAIModel
 }
 
 /**
  * Get the model for the currently active provider.
+ * In this fork, always returns OpenAI/Moonshot model.
  */
 export async function getActiveModel(): Promise<string> {
   const provider = await getProvider()
-  return provider === 'openai' ? getOpenAIModel() : getAnthropicModel()
+  return provider === 'openai' ? getOpenAIModel() : getOpenAIModel()
 }
 
 /**
