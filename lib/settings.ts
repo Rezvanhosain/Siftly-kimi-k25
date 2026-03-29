@@ -45,7 +45,7 @@ export async function getOpenAIModel(): Promise<string> {
   if (_cachedOpenAIModel && Date.now() < _openAIModelCacheExpiry) return _cachedOpenAIModel
   const setting = await prisma.setting.findUnique({ where: { key: 'openaiModel' } })
   // DEFAULT: Kimi K2.5 model for Moonshot AI
-  _cachedOpenAIModel = setting?.value ?? 'kimi-kb2.5'
+  _cachedOpenAIModel = setting?.value ?? 'kimi-k2.5'
   _openAIModelCacheExpiry = Date.now() + CACHE_TTL
   return _cachedOpenAIModel
 }

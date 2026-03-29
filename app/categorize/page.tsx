@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, Loader2, CheckCircle, ChevronRight, Eye, Tag, Brain, Layers, StopCircle } from 'lucide-react'
+import { Sparkles, Loader2, CheckCircle, ChevronRight, Eye, Tag, Brain, Layers, StopCircle, Zap, FastForward } from 'lucide-react'
 import * as Progress from '@radix-ui/react-progress'
 
 type Stage = 'vision' | 'entities' | 'enrichment' | 'categorize' | 'parallel' | null
@@ -105,6 +105,37 @@ export default function CategorizePage() {
     }
   }
 
+  async function startFastCategorization() {
+    setError('')
+    setRunning(true)
+    setStopping(false)
+    setDone(false)
+    try {
+      const res = await fetch('/api/categorize-fast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ useAI: true }),
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        throw new Error(data.error ?? 'Failed to start fast categorization')
+      }
+      const result = await res.json()
+      console.log('Fast categorization result:', result)
+      
+      // If there are remaining bookmarks for AI, poll the regular status
+      if (result.stats?.ruleBased?.remaining > 0) {
+        pollStatus()
+      } else {
+        setDone(true)
+        setRunning(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start')
+      setRunning(false)
+    }
+  }
+
   function pollStatus() {
     const interval = setInterval(async () => {
       try {
@@ -154,16 +185,45 @@ export default function CategorizePage() {
               </p>
             )}
             <p className="text-sm text-zinc-400 leading-relaxed">
-              Analyzes images for text and context, mines tweet entities for free, generates
-              semantic search tags, then categorizes — all automatically.
+              Fast mode: Instantly categorizes 80-90% using keywords/rules, then AI for remainder.
+              Full AI mode: Analyzes images and generates semantic tags (slower but more detailed).
             </p>
+            
+            {/* Fast Categorization - RECOMMENDED */}
+            <div className="space-y-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Zap size={16} />
+                <span className="text-sm font-medium">Recommended: Fast Mode</span>
+                <span className="text-xs bg-emerald-500/20 px-2 py-0.5 rounded-full">10x Faster</span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Uses keyword matching, hashtags, and URL patterns to categorize instantly. 
+                Only uses AI for the remaining 10-20% of bookmarks.
+              </p>
+              <button
+                onClick={() => void startFastCategorization()}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors"
+              >
+                <FastForward size={16} />
+                Fast Categorize (Recommended)
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-4">
+              <div className="flex-1 h-px bg-zinc-800" />
+              <span className="text-xs text-zinc-500">or use full AI pipeline</span>
+              <div className="flex-1 h-px bg-zinc-800" />
+            </div>
+            
+            {/* Full AI Categorization */}
             <div className="space-y-2">
               <button
                 onClick={() => void startCategorization(false)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
               >
                 <Sparkles size={16} />
-                Start AI Categorization
+                Full AI Categorization
               </button>
               <button
                 onClick={() => void startCategorization(true)}

@@ -30,8 +30,9 @@ RUN npm ci --omit=dev
 # Install Prisma CLI globally for migrations only
 RUN npm install -g prisma
 
-# Copy prisma schema and migrations for deploy
+# Copy prisma schema, migrations, and config for deploy
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Copy built Next.js output and generated Prisma client
 COPY --from=builder /app/.next ./.next
