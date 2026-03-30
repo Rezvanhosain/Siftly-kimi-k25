@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, Loader2, CheckCircle, ChevronRight, Eye, Tag, Brain, Layers, StopCircle, Zap, FastForward } from 'lucide-react'
+import { Sparkles, Loader2, CheckCircle, ChevronRight, Eye, Tag, Brain, Layers, StopCircle, Zap, FastForward, Filter, Shield } from 'lucide-react'
 import * as Progress from '@radix-ui/react-progress'
 
 type Stage = 'vision' | 'entities' | 'enrichment' | 'categorize' | 'parallel' | null
@@ -136,6 +136,62 @@ export default function CategorizePage() {
     }
   }
 
+  async function startCategorizeUncategorized() {
+    setError('')
+    setRunning(true)
+    setStopping(false)
+    setDone(false)
+    try {
+      const res = await fetch('/api/categorize-uncategorized', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ useAI: true }),
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        throw new Error(data.error ?? 'Failed to start categorization')
+      }
+      const result = await res.json()
+      console.log('Categorize uncategorized result:', result)
+      
+      if (result.uncategorizedCount === 0) {
+        setDone(true)
+        setRunning(false)
+        setError('All bookmarks already categorized!')
+      } else {
+        pollStatus()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start')
+      setRunning(false)
+    }
+  }
+
+  async function startFallbackCategorization() {
+    setError('')
+    setRunning(true)
+    setStopping(false)
+    setDone(false)
+    try {
+      const res = await fetch('/api/categorize-fallback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        throw new Error(data.error ?? 'Failed to start fallback categorization')
+      }
+      const result = await res.json()
+      console.log('Fallback categorization result:', result)
+      
+      setDone(true)
+      setRunning(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start')
+      setRunning(false)
+    }
+  }
+
   function pollStatus() {
     const interval = setInterval(async () => {
       try {
@@ -216,6 +272,51 @@ export default function CategorizePage() {
               <div className="flex-1 h-px bg-zinc-800" />
             </div>
             
+            {/* Categorize Only Uncategorized */}
+            <div className="space-y-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <div className="flex items-center gap-2 text-blue-400">
+                <Filter size={16} />
+                <span className="text-sm font-medium">Categorize Uncategorized Only</span>
+                <span className="text-xs bg-blue-500/20 px-2 py-0.5 rounded-full">Skips already categorized</span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Only processes bookmarks that have NO categories. Perfect for finishing up after fast mode.
+              </p>
+              <button
+                onClick={() => void startCategorizeUncategorized()}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+              >
+                <Filter size={16} />
+                Categorize Uncategorized Only
+              </button>
+            </div>
+
+            {/* Fallback Categorization */}
+            <div className="space-y-3 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+              <div className="flex items-center gap-2 text-orange-400">
+                <Shield size={16} />
+                <span className="text-sm font-medium">Fallback Categorization</span>
+                <span className="text-xs bg-orange-500/20 px-2 py-0.5 rounded-full">If AI fails</span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Simple keyword matching for bookmarks that fail AI categorization. Assigns to General category by default.
+              </p>
+              <button
+                onClick={() => void startFallbackCategorization()}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-medium transition-colors"
+              >
+                <Shield size={16} />
+                Fallback Categorize
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-4">
+              <div className="flex-1 h-px bg-zinc-800" />
+              <span className="text-xs text-zinc-500">advanced options</span>
+              <div className="flex-1 h-px bg-zinc-800" />
+            </div>
+
             {/* Full AI Categorization */}
             <div className="space-y-2">
               <button
@@ -223,7 +324,7 @@ export default function CategorizePage() {
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
               >
                 <Sparkles size={16} />
-                Full AI Categorization
+                Full AI Categorization (All)
               </button>
               <button
                 onClick={() => void startCategorization(true)}

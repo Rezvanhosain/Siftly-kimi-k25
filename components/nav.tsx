@@ -125,6 +125,13 @@ export default function Nav() {
     return localStorage.getItem('nav-collections-open') !== 'false'
   })
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null)
+  
+  // Resizable sidebar state
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === 'undefined') return 228
+    return parseInt(localStorage.getItem('sidebar-width') || '228', 10)
+  })
+  const [isResizing, setIsResizing] = useState(false)
 
   function toggleCollections() {
     setCollectionsOpen((v) => {
@@ -138,6 +145,41 @@ export default function Nav() {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
   }
 
+  // Resize handlers
+  function startResizing(e: React.MouseEvent) {
+    setIsResizing(true)
+    e.preventDefault()
+  }
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!isResizing) return
+      const newWidth = Math.max(180, Math.min(400, e.clientX))
+      setSidebarWidth(newWidth)
+    }
+
+    function stopResizing() {
+      if (isResizing) {
+        setIsResizing(false)
+        localStorage.setItem('sidebar-width', String(sidebarWidth))
+      }
+    }
+
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', stopResizing)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', stopResizing)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing, sidebarWidth])
+
   useEffect(() => {
     function handleCleared() {
       setCategories([])
@@ -147,7 +189,8 @@ export default function Nav() {
     return () => window.removeEventListener('siftly:cleared', handleCleared)
   }, [])
 
-  useEffect(() => {
+  // Function to refresh categories and stats
+  function refreshData() {
     // Fetch stats
     fetch('/api/stats')
       .then((r) => r.json())
@@ -161,23 +204,51 @@ export default function Nav() {
       .then((r) => r.json())
       .then((d: { categories: CategoryItem[] }) => setCategories(d.categories ?? []))
       .catch(() => {})
+  }
+
+  useEffect(() => {
+    // Initial load
+    refreshData()
 
     // Poll pipeline status every 3s to show global indicator
     function pollPipeline() {
       fetch('/api/categorize')
         .then((r) => r.json())
-        .then((d: PipelineStatus) => setPipeline(d))
+        .then((d: PipelineStatus) => {
+          setPipeline(d)
+          // Refresh categories when pipeline completes
+          if (d.status === 'idle' && pipeline?.status === 'running') {
+            refreshData()
+          }
+        })
         .catch(() => {})
     }
     pollPipeline()
     const interval = setInterval(pollPipeline, 3000)
-    return () => clearInterval(interval)
-  }, [])
+    
+    // Listen for custom refresh event
+    function handleRefresh() {
+      refreshData()
+    }
+    window.addEventListener('siftly:refresh-categories', handleRefresh)
+    
+    // Refresh when pathname changes (user navigates)
+    refreshData()
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('siftly:refresh-categories', handleRefresh)
+    }
+  }, [pathname])
 
   const visibleCats = showAllCats ? categories : categories.slice(0, 8)
 
   return (
-    <aside className="flex flex-col bg-zinc-900 border-r border-zinc-800/50 shrink-0 sticky top-0 h-screen overflow-y-auto" style={{ width: '228px' }}>
+    <>
+      <aside 
+        className="flex flex-col bg-zinc-900 border-r border-zinc-800/50 shrink-0 h-screen overflow-y-auto relative" 
+        style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
+      >
 
       {/* Brand */}
       <div className="flex items-center justify-center gap-3 px-4 py-3.5 border-b border-zinc-800/50">
@@ -321,6 +392,19 @@ export default function Nav() {
       )}
 
       <SupportFooter />
+      
+      {/* Resize handle - make it visible */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-indigo-500/50 active:bg-indigo-500/70 transition-colors z-50 group"
+        onMouseDown={startResizing}
+        style={{ 
+          background: isResizing ? 'rgba(99, 102, 241, 0.5)' : 'rgba(99, 102, 241, 0.1)',
+        }}
+      >
+        {/* Visual indicator */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-zinc-600 group-hover:bg-indigo-400 transition-colors" />
+      </div>
     </aside>
+    </>
   )
 }

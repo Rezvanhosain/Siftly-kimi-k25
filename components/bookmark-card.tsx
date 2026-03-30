@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
-import { ExternalLink, Download, Play, Pencil, X, Check, ImageOff, Bookmark, Globe } from 'lucide-react'
+import { ExternalLink, Download, Play, Pencil, X, Check, ImageOff, Bookmark, Globe, Film } from 'lucide-react'
 import type { BookmarkWithMedia, Category } from '@/lib/types'
 
 // ── URL helpers ────────────────────────────────────────────────────────────────
@@ -292,6 +292,11 @@ function isVideoUrl(url: string): boolean {
 interface TopMediaSlotProps {
   item: BookmarkWithMedia['mediaItems'][number]
   tweetUrl: string
+  tweetText?: string
+  mediaCount?: number
+  authorName?: string
+  authorHandle?: string
+  date?: string
 }
 
 /** Consistent overlay shown on top of a thumbnail — used for both video and X-link cases */
@@ -307,18 +312,148 @@ function MediaOverlay({ label, icon }: { label?: string; icon?: React.ReactNode 
   )
 }
 
+/** Video preview card that shows tweet text as the preview */
+function VideoPreviewCard({ 
+  tweetText, 
+  tweetUrl, 
+  mediaCount,
+  authorName,
+  authorHandle,
+  date
+}: { 
+  tweetText: string
+  tweetUrl: string
+  mediaCount: number 
+  authorName: string
+  authorHandle: string
+  date: string
+}) {
+  // Clean up text for display
+  const cleanText = tweetText
+    .replace(/https?:\/\/t\.co\/\w+/g, '')
+    .replace(/https?:\/\/[^\s]+/g, '')
+    .trim()
+  
+  // Get first 120 chars for preview
+  const previewText = cleanText.length > 120 ? cleanText.slice(0, 120) + '...' : cleanText
+  
+  // Generate unique background based on author
+  const bgHash = authorHandle.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const hue = bgHash % 360
+  const gradientBg = `linear-gradient(135deg, hsl(${hue}, 40%, 15%), hsl(${(hue + 40) % 360}, 40%, 10%))`
+  
+  return (
+    <a 
+      href={tweetUrl} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="relative block h-48 overflow-hidden group"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Dynamic gradient background based on author */}
+      <div 
+        className="absolute inset-0 transition-all duration-500"
+        style={{ background: gradientBg }}
+      >
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 3px 3px, rgba(255,255,255,0.2) 1.5px, transparent 0)',
+            backgroundSize: '24px 24px'
+          }} />
+        </div>
+        
+        {/* Gradient overlay for better text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+      </div>
+      
+      {/* Content overlay */}
+      <div className="absolute inset-0 p-4 flex flex-col">
+        {/* Top row: Author info & Video badge */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            {/* Avatar placeholder */}
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+              style={{ backgroundColor: `hsl(${hue}, 60%, 45%)` }}
+            >
+              {authorName.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-white truncate max-w-[120px]">
+                {authorName !== 'Unknown' ? authorName : 'Video'}
+              </span>
+              <span className="text-[10px] text-zinc-400">
+                @{authorHandle !== 'unknown' ? authorHandle : 'twitter'}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/50 border border-white/10 backdrop-blur-sm">
+            <Film size={10} className="text-zinc-300" />
+            <span className="text-[10px] text-zinc-300 font-medium">
+              {mediaCount > 1 ? `${mediaCount}` : 'Video'}
+            </span>
+          </div>
+        </div>
+        
+        {/* Center: Tweet text preview - LARGER */}
+        <div className="flex-1 flex items-center justify-center py-2">
+          <p className="text-base text-white text-center font-medium line-clamp-3 leading-relaxed px-2 drop-shadow-lg">
+            {previewText || 'Video on X'}
+          </p>
+        </div>
+        
+        {/* Bottom: Date and Watch button */}
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-zinc-400">{date}</span>
+          
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-all border border-white/20 backdrop-blur-sm group-hover:bg-white/25">
+            <Play size={12} className="text-white fill-white" />
+            <span className="text-xs text-white font-medium">Watch</span>
+            <ExternalLink size={10} className="text-white/70" />
+          </div>
+        </div>
+      </div>
+    </a>
+  )
+}
+
 /** Placeholder shown when no thumbnail is available — styled as a proper video preview */
 function MediaPlaceholder({ onClick, label, isVideo }: { onClick?: (e: React.MouseEvent) => void; label: string; isVideo?: boolean }) {
   if (isVideo) {
     return (
       <div
-        className="h-48 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-zinc-800 to-zinc-900 hover:from-zinc-750 hover:to-zinc-850 transition-colors cursor-pointer select-none"
+        className="h-48 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black hover:from-zinc-700 hover:via-zinc-800 hover:to-zinc-900 transition-all cursor-pointer select-none relative overflow-hidden"
         onClick={onClick}
       >
-        <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center border border-white/10">
-          <Play size={22} className="text-white fill-white ml-1" />
+        {/* Video pattern background */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
+            backgroundSize: '20px 20px'
+          }} />
         </div>
-        <span className="text-xs text-zinc-400 font-medium">{label}</span>
+        
+        {/* Play button */}
+        <div className="relative w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 transition-all flex items-center justify-center border-2 border-white/30 hover:border-white/50 shadow-lg shadow-black/50 backdrop-blur-sm">
+          <Play size={28} className="text-white fill-white ml-1" />
+        </div>
+        
+        {/* Label */}
+        <span className="relative text-xs text-zinc-400 font-medium bg-black/30 px-3 py-1 rounded-full">{label}</span>
+        
+        {/* Film strip decoration */}
+        <div className="absolute top-0 left-0 right-0 h-2 bg-zinc-800 flex">
+          {[...Array(20)].map((_, i) => (
+            <div key={i} className="flex-1 border-r border-zinc-700/50" />
+          ))}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-2 bg-zinc-800 flex">
+          {[...Array(20)].map((_, i) => (
+            <div key={i} className="flex-1 border-r border-zinc-700/50" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -334,7 +469,7 @@ function MediaPlaceholder({ onClick, label, isVideo }: { onClick?: (e: React.Mou
   )
 }
 
-function TopMediaSlot({ item, tweetUrl }: TopMediaSlotProps) {
+function TopMediaSlot({ item, tweetUrl, tweetText, mediaCount = 1, authorName = 'Unknown', authorHandle = 'unknown', date = '' }: TopMediaSlotProps) {
   const [imgError, setImgError] = useState(false)
 
   // ── Photo: show inline ─────────────────────────────────────────────────────
@@ -363,30 +498,62 @@ function TopMediaSlot({ item, tweetUrl }: TopMediaSlotProps) {
     )
   }
 
-  // ── Video/GIF: always redirect to tweet — can't play locally ──────────────
-  // Guard: thumbnailUrl that is itself a video URL is not usable as an <img>
-  const rawThumb = item.thumbnailUrl ?? null
-  const thumb = rawThumb && !isVideoUrl(rawThumb) ? rawThumb
-    : (!isVideoUrl(item.url) ? item.url : null)
+  // ── Video/GIF: Show video preview with extracted thumbnail ──────────────
+  if (item.type === 'video' || item.type === 'animated_gif') {
+    // Check for valid thumbnail (extracted or from URL pattern)
+    let thumb: string | null = null
+    
+    // First priority: extracted thumbnail from our extraction service
+    if (item.thumbnailUrl && !isVideoUrl(item.thumbnailUrl) && item.thumbnailUrl.startsWith('http')) {
+      thumb = item.thumbnailUrl
+    }
+    
+    // If we have a valid thumbnail image, show it with play overlay
+    if (thumb && !imgError) {
+      return (
+        <a href={tweetUrl} target="_blank" rel="noopener noreferrer" className="relative block" onClick={(e) => e.stopPropagation()}>
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={proxyUrl(thumb)}
+              alt="Video thumbnail"
+              className="w-full h-48 object-cover"
+              loading="lazy"
+              onError={() => setImgError(true)}
+            />
+            {/* Dark overlay for better play button visibility */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+            {/* Centered play button */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-lg transition-transform hover:scale-110">
+                <Play size={28} className="text-zinc-900 fill-zinc-900 ml-1" />
+              </div>
+            </div>
+            {/* Video duration badge if available */}
+            <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 rounded text-xs text-white font-medium">
+              Video
+            </div>
+          </div>
+        </a>
+      )
+    }
 
+    // No thumbnail available - show VideoPreviewCard with tweet text
+    return (
+      <VideoPreviewCard 
+        tweetText={tweetText || ''} 
+        tweetUrl={tweetUrl}
+        mediaCount={mediaCount}
+        authorName={authorName}
+        authorHandle={authorHandle}
+        date={date}
+      />
+    )
+  }
+
+  // Fallback for other types
   return (
-    <a href={tweetUrl} target="_blank" rel="noopener noreferrer" className="relative block" onClick={(e) => e.stopPropagation()}>
-      {thumb && !imgError ? (
-        <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={proxyUrl(thumb)}
-            alt=""
-            className="w-full h-48 object-cover"
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
-          <MediaOverlay />
-        </div>
-      ) : (
-        <MediaPlaceholder label="Watch on X ↗" isVideo={item.type === 'video'} />
-      )}
-    </a>
+    <MediaPlaceholder label="View on X ↗" isVideo={false} />
   )
 }
 
@@ -635,7 +802,15 @@ export default function BookmarkCard({ bookmark }: BookmarkCardProps) {
       {/* Top media — full bleed, no padding */}
       {firstMedia && (
         <div className="border-b border-zinc-800/60 rounded-t-2xl overflow-hidden shrink-0">
-          <TopMediaSlot item={firstMedia} tweetUrl={tweetUrl} />
+          <TopMediaSlot 
+            item={firstMedia} 
+            tweetUrl={tweetUrl} 
+            tweetText={bookmark.text}
+            mediaCount={bookmark.mediaItems.length}
+            authorName={bookmark.authorName}
+            authorHandle={bookmark.authorHandle}
+            date={formatDate(bookmark.tweetCreatedAt ?? bookmark.importedAt ?? null)}
+          />
         </div>
       )}
 

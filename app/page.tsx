@@ -232,6 +232,7 @@ export default async function DashboardPage() {
           iconColor="text-violet-400"
           iconBg="bg-violet-500/10"
           borderColor="border-t-violet-500"
+          href="/bookmarks?media=true"
         />
         <StatCard
           label="Uncategorized"

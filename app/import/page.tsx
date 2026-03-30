@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
-import { Upload, CheckCircle, ChevronRight, Loader2, Copy, Check, ExternalLink, Sparkles, Eye, Tag, Brain, Layers, StopCircle, RefreshCw, Clock, KeyRound, Trash2, AlertCircle, User, LogOut } from 'lucide-react'
+import { Upload, CheckCircle, ChevronRight, Loader2, Copy, Check, ExternalLink, Sparkles, Eye, Tag, Brain, Layers, StopCircle, RefreshCw, Clock, KeyRound, Trash2, AlertCircle, User, LogOut, FastForward } from 'lucide-react'
 import * as Progress from '@radix-ui/react-progress'
 
 type Step = 1 | 2 | 3
@@ -970,6 +970,7 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
   const [stopping, setStopping] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  const [autoStart, setAutoStart] = useState(false) // Changed to false - user must click to start
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Clean up poll interval on unmount
@@ -984,6 +985,8 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
   useEffect(() => {
     // All skipped — nothing to categorize
     if (importedCount === 0) return
+    // User chose to skip auto-categorization
+    if (!autoStart) return
 
     void (async () => {
       try {
@@ -1004,7 +1007,7 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [autoStart])
 
   async function stopCategorization() {
     setStopping(true)
@@ -1023,10 +1026,11 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
     setStopping(false)
     setDone(false)
     try {
-      const res = await fetch('/api/categorize', {
+      // Use fast categorization endpoint instead of slow AI
+      const res = await fetch('/api/categorize-fast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(force ? { force: true } : {}),
+        body: JSON.stringify({ useAI: true }),
       })
       if (!res.ok && res.status !== 409) {
         const data = await res.json() as { error?: string }
@@ -1073,6 +1077,30 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
 
   return (
     <div className="space-y-6">
+      {/* Skip auto-categorization option */}
+      {!running && !done && !error && importedCount > 0 && autoStart === false && (
+        <div className="space-y-4 p-4 rounded-xl bg-zinc-800/50 border border-zinc-700">
+          <p className="text-sm text-zinc-300">
+            <strong>{importedCount} bookmarks</strong> imported successfully. Ready to categorize!
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => void startCategorization()}
+              className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <FastForward size={16} />
+              Fast Categorize Now
+            </button>
+            <Link
+              href="/bookmarks"
+              className="px-4 py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm font-medium transition-colors"
+            >
+              Skip for now
+            </Link>
+          </div>
+        </div>
+      )}
+
       {!running && !done && error && (
         <div className="space-y-3">
           <p className="text-sm text-red-400">{error}</p>
@@ -1190,7 +1218,7 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
               className="flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors border border-zinc-700"
             >
               <RefreshCw size={14} />
-              Reprocess all
+              Fast Reprocess
             </button>
           </div>
         </div>
@@ -1219,7 +1247,7 @@ function CategorizeStep({ importedCount, force = false }: { importedCount: numbe
               className="flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors border border-zinc-700"
             >
               <RefreshCw size={14} />
-              Reprocess all
+              Fast Reprocess
             </button>
           </div>
         </div>
@@ -1308,6 +1336,8 @@ export default function ImportPage() {
   function handleLiveSynced(result: ImportResult) {
     setImportResult(result)
     setStep(2)
+    // Trigger sidebar refresh
+    window.dispatchEvent(new CustomEvent('siftly:refresh-categories'))
     setTimeout(() => setStep(3), 1500)
   }
 
@@ -1341,6 +1371,9 @@ export default function ImportPage() {
         // Parser couldn't extract any bookmarks — likely wrong format
         throw new Error('Could not parse any bookmarks from this file. Make sure you\'re uploading a Twitter/X bookmarks JSON export.')
       }
+
+      // Trigger sidebar refresh
+      window.dispatchEvent(new CustomEvent('siftly:refresh-categories'))
 
       // Auto-advance to categorization after a brief moment to show the result
       setTimeout(() => setStep(3), 1500)

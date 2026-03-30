@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { parseBookmarksJson } from '@/lib/parser'
+import { extractVideoThumbnail } from '@/lib/video-thumbnail-extractor'
+import { generateThumbnailFromVideoUrl } from '@/lib/video-thumbnail-extractor'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let formData: FormData
@@ -99,14 +101,47 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       })
 
       if (bookmark.media.length > 0) {
-        await prisma.mediaItem.createMany({
-          data: bookmark.media.map((m) => ({
-            bookmarkId: created.id,
-            type: m.type,
-            url: m.url,
-            thumbnailUrl: m.thumbnailUrl ?? null,
-          })),
-        })
+        // Process each media item, extracting thumbnails for videos
+        for (const media of bookmark.media) {
+          let thumbnailUrl = media.thumbnailUrl
+          
+          // If it's a video without a valid thumbnail, try to extract one
+          if (media.type === 'video' && (!thumbnailUrl || thumbnailUrl.includes('.mp4'))) {
+            try {
+              const tweetUrl = `https://twitter.com/i/status/${bookmark.tweetId}`
+              const result = await extractVideoThumbnail(
+                bookmark.tweetId,
+                media.url,
+                tweetUrl
+              )
+              if (result.thumbnailUrl) {
+                thumbnailUrl = result.thumbnailUrl
+              } else {
+                // Fallback: try URL pattern generation
+                const patternUrl = generateThumbnailFromVideoUrl(media.url)
+                if (patternUrl) {
+                  thumbnailUrl = patternUrl
+                }
+              }
+            } catch (err) {
+              console.log(`Failed to extract thumbnail for ${bookmark.tweetId}:`, err)
+              // Fallback to pattern generation
+              const patternUrl = generateThumbnailFromVideoUrl(media.url)
+              if (patternUrl) {
+                thumbnailUrl = patternUrl
+              }
+            }
+          }
+          
+          await prisma.mediaItem.create({
+            data: {
+              bookmarkId: created.id,
+              type: media.type,
+              url: media.url,
+              thumbnailUrl: thumbnailUrl ?? null,
+            },
+          })
+        }
       }
 
       importedCount++
